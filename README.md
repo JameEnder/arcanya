@@ -1,5 +1,5 @@
 <p align="center">
-	<a href="https://github.com/jameender/arcanya">hi</a>
+	<a href="https://github.com/jameender/arcanya"><img src="https://repository-images.githubusercontent.com/704522788/52df08e7-e797-424b-aa69-336f9499bb68" alt="Logo" height=200></a>
 </p>
 
 <h1 align="center">Arcanya</h1>
