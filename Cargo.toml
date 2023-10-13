@@ -1,0 +1,12 @@
+[package]
+name = "arcanya"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.75"
+hashbrown = "0.14.0"
+nom = "7.1.3"
+tiny_http = "0.12.0"
