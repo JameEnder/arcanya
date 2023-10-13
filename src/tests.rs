@@ -464,18 +464,18 @@ fn bench_fibonacci_impl(std: &mut Rc<RefCell<Env>>, n: u32) {
     run(std, &format!("(fibonacci {n})")).unwrap();
 }
 
-extern crate test;
+// extern crate test;
 
-#[bench]
-fn bench_fibonacci_15(b: &mut test::Bencher) {
-    let mut std = Rc::new(RefCell::new(std_lib()));
+// #[bench]
+// fn bench_fibonacci_15(b: &mut test::Bencher) {
+//     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    b.iter(|| bench_fibonacci_impl(&mut std, test::black_box(15)));
-}
+//     b.iter(|| bench_fibonacci_impl(&mut std, test::black_box(15)));
+// }
 
-#[bench]
-fn bench_fibonacci_20(b: &mut test::Bencher) {
-    let mut std = Rc::new(RefCell::new(std_lib()));
+// #[bench]
+// fn bench_fibonacci_20(b: &mut test::Bencher) {
+//     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    b.iter(|| bench_fibonacci_impl(&mut std, test::black_box(20)));
-}
+//     b.iter(|| bench_fibonacci_impl(&mut std, test::black_box(20)));
+// }
