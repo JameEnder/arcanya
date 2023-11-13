@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
     character::complete::{alpha1, alphanumeric1, char, digit1, multispace0, multispace1},
-    combinator::{cut, map, map_res, recognize},
+    combinator::{cut, map, map_res, opt, recognize},
     multi::{many0_count, separated_list0},
     sequence::{delimited, pair, preceded, separated_pair, tuple},
     IResult,
@@ -55,15 +55,15 @@ fn parse_symbol(input: &str) -> IResult<&str, Expression> {
 pub fn parse_float(input: &str) -> IResult<&str, Expression> {
     alt((
         map(
-            map_res(separated_pair(digit1, tag("."), digit1), |(a, b)| {
-                format!("{a}.{b}").parse::<f64>()
+            map_res(separated_pair(digit1, tag("."), opt(digit1)), |(a, b)| {
+                format!("{}.{}", a, b.unwrap_or("0")).parse::<f64>()
             }),
             |f: f64| Expression::Float(f),
         ),
         map(
             map_res(
-                preceded(tag("-"), separated_pair(digit1, tag("."), digit1)),
-                |(a, b)| format!("{a}.{b}").parse::<f64>(),
+                preceded(tag("-"), separated_pair(digit1, tag("."), opt(digit1))),
+                |(a, b)| format!("{}.{}", a, b.unwrap_or("0")).parse::<f64>(),
             ),
             |f: f64| Expression::Float(-f),
         ),
