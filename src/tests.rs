@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::builtin::std_lib;
-use crate::env::Env;
 use crate::expression::Expression;
 use crate::run;
 
@@ -28,7 +27,7 @@ fn add_two_floats() {
 fn map_numbers_add() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(map (function (x) (+ x 1)) (1 2 3))").unwrap();
+    let result = run(&mut std, "(map (function '(x) '(+ x 1)) '(1 2 3))").unwrap();
 
     assert_eq!(
         result,
@@ -44,7 +43,7 @@ fn map_numbers_add() {
 fn fold() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(fold (function (acc x) (+ acc x)) 0 (1 2 3))").unwrap();
+    let result = run(&mut std, "(fold + 0 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(6));
 }
@@ -53,14 +52,14 @@ fn fold() {
 fn filter() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(filter (function (x) (< x 3)) (1 2 3 4 5))").unwrap();
+    let result = run(&mut std, "(filter (function '(x) '(< x 3)) '(1 2 3 4 5))").unwrap();
 
     assert_eq!(
         result,
         Expression::List(vec![Expression::Integer(1), Expression::Integer(2)])
     );
 
-    let result = run(&mut std, "(filter (function (x) (> x 3)) (1 2 3 4 5))").unwrap();
+    let result = run(&mut std, "(filter (function '(x) '(> x 3)) '(1 2 3 4 5))").unwrap();
 
     assert_eq!(
         result,
@@ -81,7 +80,7 @@ fn concat_strings() {
 fn create_add_xy_function() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(function (x y) (+ x y))").unwrap();
+    let result = run(&mut std, "(function '(x y) '(+ x y))").unwrap();
 
     assert_eq!(
         result,
@@ -103,7 +102,7 @@ fn create_add_xy_function() {
 fn add_xy_function() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "((function (x y) (+ x y)) 1 2)").unwrap();
+    let result = run(&mut std, "((function '(x y) '(+ x y)) 1 2)").unwrap();
 
     assert_eq!(result, Expression::Integer(3));
 }
@@ -114,13 +113,13 @@ fn fibonacci() {
 
     let result = run(
         &mut std,
-        "(define fibonacci (function (x)
-            (if (<= x 2) 1 (+ (fibonacci (- x 1)) (fibonacci (- x 2)))))
+        "(define fibonacci (function '(x)
+            '(if (<= x 2) 1 (+ (fibonacci (- x 1)) (fibonacci (- x 2)))))
         )",
     )
     .unwrap();
 
-    assert_eq!(result, Expression::Void);
+    assert_eq!(result, Expression::Nil);
 
     let correct_results = vec![0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
 
@@ -155,10 +154,10 @@ fn let_multi() {
 
     let result = run(
         &mut std,
-        "(let* (
-            (x 1)
-            (y 2)
-            (z 3)
+        "(let* '(
+            '(x 1)
+            '(y 2)
+            '(z 3)
         ) (+ x y z))",
     )
     .unwrap();
@@ -173,12 +172,12 @@ fn partial_application_left() {
     let result = run(
         &mut std,
         "(define add-xyz (
-            function (x y z) (+ x y z)
+            function '(x y z) '(+ x y z)
         ))",
     )
     .unwrap();
 
-    assert_eq!(result, Expression::Void);
+    assert_eq!(result, Expression::Nil);
 
     let result = run(&mut std, "add-xyz").unwrap();
 
@@ -244,12 +243,12 @@ fn partial_application_right() {
     let result = run(
         &mut std,
         "(define add-xyz (
-            function (x y z) (+ x y z)
+            function '(x y z) '(+ x y z)
         ))",
     )
     .unwrap();
 
-    assert_eq!(result, Expression::Void);
+    assert_eq!(result, Expression::Nil);
 
     let result = run(&mut std, "add-xyz").unwrap();
 
@@ -315,7 +314,7 @@ fn and_then() {
     let result = run(
         &mut std,
         "(and-then
-            (define add (function (x y) (+ x y)))
+            (define add (function '(x y) '(+ x y)))
             (add 1 2)
         )",
     )
@@ -362,7 +361,7 @@ fn round() {
 fn append() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(append (1 2 3) 4)").unwrap();
+    let result = run(&mut std, "(append 4 '(1 2 3))").unwrap();
 
     assert_eq!(
         result,
@@ -379,7 +378,7 @@ fn append() {
 fn prepend() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(prepend (2 3 4) 1)").unwrap();
+    let result = run(&mut std, "(prepend 1 '(2 3 4))").unwrap();
 
     assert_eq!(
         result,
@@ -396,15 +395,15 @@ fn prepend() {
 fn index() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(index 0 (1 2 3))").unwrap();
+    let result = run(&mut std, "(index 0 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(1));
 
-    let result = run(&mut std, "(index 1 (1 2 3))").unwrap();
+    let result = run(&mut std, "(index 1 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(2));
 
-    let result = run(&mut std, "(index 2 (1 2 3))").unwrap();
+    let result = run(&mut std, "(index 2 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(3));
 }
@@ -413,19 +412,19 @@ fn index() {
 fn slice() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(slice 0 4 (1 2 3))");
+    let result = run(&mut std, "(slice 0 4 '(1 2 3))");
 
-    assert_eq!(result.is_err(), true);
+    assert!(result.is_err());
 
-    let result = run(&mut std, "(slice -1 1 (1 2 3))");
+    let result = run(&mut std, "(slice -1 1 '(1 2 3))");
 
-    assert_eq!(result.is_err(), true);
+    assert!(result.is_err());
 
-    let result = run(&mut std, "(slice 2 2 (1 2 3))");
+    let result = run(&mut std, "(slice 2 2 '(1 2 3))");
 
-    assert_eq!(result.is_err(), true);
+    assert!(result.is_err());
 
-    let result = run(&mut std, "(slice 0 3 (1 2 3))").unwrap();
+    let result = run(&mut std, "(slice 0 3 '(1 2 3))").unwrap();
 
     assert_eq!(
         result,
@@ -436,46 +435,18 @@ fn slice() {
         ])
     );
 
-    let result = run(&mut std, "(slice 0 2 (1 2 3))").unwrap();
+    let result = run(&mut std, "(slice 0 2 '(1 2 3))").unwrap();
 
     assert_eq!(
         result,
         Expression::List(vec![Expression::Integer(1), Expression::Integer(2),])
     );
 
-    let result = run(&mut std, "(slice 0 1 (1 2 3))").unwrap();
+    let result = run(&mut std, "(slice 0 1 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::List(vec![Expression::Integer(1)]));
 
-    let result = run(&mut std, "(slice 0 0 (1 2 3))").unwrap();
+    let result = run(&mut std, "(slice 0 0 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::List(vec![]));
 }
-
-fn bench_fibonacci_impl(std: &mut Rc<RefCell<Env>>, n: u32) {
-    run(
-        std,
-        "(define fibonacci (function (x)
-            (if (<= x 2) 1 (+ (fibonacci (- x 1)) (fibonacci (- x 2)))))
-        )",
-    )
-    .unwrap();
-
-    run(std, &format!("(fibonacci {n})")).unwrap();
-}
-
-// extern crate test;
-
-// #[bench]
-// fn bench_fibonacci_15(b: &mut test::Bencher) {
-//     let mut std = Rc::new(RefCell::new(std_lib()));
-
-//     b.iter(|| bench_fibonacci_impl(&mut std, test::black_box(15)));
-// }
-
-// #[bench]
-// fn bench_fibonacci_20(b: &mut test::Bencher) {
-//     let mut std = Rc::new(RefCell::new(std_lib()));
-
-//     b.iter(|| bench_fibonacci_impl(&mut std, test::black_box(20)));
-// }

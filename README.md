@@ -78,9 +78,9 @@ Defining local variables can be done with `let`
 Or by using let multiple with `let*`
 
 ```lisp
-(let* (
-	(x 5)
-	(y 7)
+(let* '(
+	'(x 5)
+	'(y 7)
 ) (+ x y))
 ; 12
 ```
@@ -89,8 +89,8 @@ You can map over lists with `map`
 
 ```lisp
 (map
-	(function (x) (* x 2))
-	(1 2 3)
+	(function '(x) '(* x 2))
+	'(1 2 3)
 )
 ; (2 4 6)
 ```
@@ -98,7 +98,7 @@ You can map over lists with `map`
 And fold over lists with `fold`
 
 ```lisp
-(fold + 0 (1 2 3))
+(fold + 0 '(1 2 3))
 ; 6
 ```
 

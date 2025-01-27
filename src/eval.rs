@@ -1,69 +1,50 @@
-use anyhow::{anyhow, Result};
+use color_eyre::{eyre::eyre, Result, Section};
 use hashbrown::HashMap;
-use std::{cell::RefCell, rc::Rc, sync::Mutex};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use crate::{Env, Expression};
+use crate::{env::Env, expression::Expression};
 
-pub static EVALUATION_COUNT: Mutex<i64> = Mutex::new(0);
+pub static EVALUATION_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static DEBUG_MODE: bool = false;
 #[allow(dead_code)]
-pub static LAST_EVALUATION_COUNT: Mutex<i64> = Mutex::new(0);
+pub static LAST_EVALUATION_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub fn eval_expression(env: &mut Rc<RefCell<Env>>, expr: Expression) -> Result<Expression> {
     match expr {
         Expression::Integer(_)
         | Expression::String(_)
-        | Expression::Builtin(_)
+        | Expression::Builtin {
+            name: _,
+            function: _,
+        }
         | Expression::Float(_)
-        | Expression::Boolean(_)
         | Expression::Function {
             arguments: _,
             body: _,
         }
-        | Expression::Named { name: _, value: _ }
-        | Expression::Void => Ok(expr),
-
-        Expression::Symbol(s) => {
-            let mut value = env.borrow().get(s).unwrap_or(Expression::Void);
-
-            while let Expression::Symbol(s) = value {
-                value = env.borrow().get(s).unwrap();
-            }
-
-            if let Expression::Symbol(s) = value {
-                env.borrow()
-                    .get(s.clone())
-                    .ok_or(anyhow!(format!("Symbol {s} not bound")))
-            } else {
-                Ok(value.clone())
-            }
-        }
-        Expression::List(ref list) => {
-            if (matches!(list[0], Expression::Symbol(_))
-                && env.borrow().get(list[0].as_symbol_string()?).is_some())
-                || matches!(
-                    eval_expression(env, list[0].clone()),
-                    Ok(Expression::Function {
-                        arguments: _,
-                        body: _
-                    })
-                )
-            {
-                eval_call(env, list)
-            } else {
-                Ok(expr)
-            }
-        }
+        | Expression::Table(_)
+        | Expression::Nil => Ok(expr),
+        Expression::Symbol(s) => Ok(env.borrow().get(s).unwrap_or(Expression::Nil)),
+        Expression::List(l) => eval_list(env, &l),
     }
 }
 
-pub fn eval_call(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expression> {
+pub fn eval_list(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expression> {
     let mut caller = eval_expression(env, list[0].clone())?;
 
     while let Expression::List(_) = caller {
         caller = eval_expression(env, caller)?;
     }
 
-    *EVALUATION_COUNT.lock().unwrap() += 1;
+    EVALUATION_COUNT.fetch_add(1, Ordering::SeqCst);
+
+    if DEBUG_MODE {
+        println!("{}", Expression::List(list.to_vec()).as_debug_string());
+    }
 
     match caller {
         Expression::Function { arguments, body } => {
@@ -108,7 +89,7 @@ pub fn eval_call(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expr
                         body: Box::new(Expression::List(new_body)),
                     })
                 } else {
-                    Ok(Expression::Void)
+                    Ok(Expression::Nil)
                 }
             } else {
                 for i in 0..arguments.len() {
@@ -125,8 +106,16 @@ pub fn eval_call(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expr
             }
         }
         // TODO: Partial application on Builtins
-        Expression::Builtin(f) => f(env, &list[1..]),
-        Expression::List(l) => eval_call(env, &l),
+        Expression::Builtin { name: _, function } => function(env, &list[1..]).map_err(|e| {
+            e.note(format!(
+                "Evaluating: ({})",
+                list.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ))
+        }),
+        Expression::List(l) => eval_list(env, &l),
         _ => Ok(caller),
     }
 }

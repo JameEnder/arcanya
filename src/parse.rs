@@ -8,18 +8,21 @@ use nom::{
     IResult,
 };
 
-use crate::Expression;
+use crate::expression::Expression;
 
 fn parse_bool(input: &str) -> IResult<&str, Expression> {
-    map(alt((tag("true"), tag("false"))), |s: &str| match s {
-        "true" => Expression::Boolean(true),
-        "false" => Expression::Boolean(false),
-        _ => unreachable!(),
-    })(input)
+    map(
+        alt((tag("true"), tag("false"), tag("#t"), tag("#f"), tag("nil"))),
+        |s: &str| match s {
+            "true" | "#t" => true.into(),
+            "false" | "#f" | "nil" => false.into(),
+            _ => unreachable!(),
+        },
+    )(input)
 }
 
 fn parse_void(input: &str) -> IResult<&str, Expression> {
-    map(tag("void"), |_| Expression::Void)(input)
+    map(tag("void"), |_| Expression::Nil)(input)
 }
 
 fn parse_symbol(input: &str) -> IResult<&str, Expression> {
@@ -31,6 +34,7 @@ fn parse_symbol(input: &str) -> IResult<&str, Expression> {
                 tag("+"),
                 tag("-"),
                 tag("/"),
+                tag("%"),
                 tag("*"),
                 tag("="),
                 tag(">"),
@@ -42,6 +46,7 @@ fn parse_symbol(input: &str) -> IResult<&str, Expression> {
                 tag("+"),
                 tag("-"),
                 tag("/"),
+                tag("%"),
                 tag("*"),
                 tag("="),
                 tag(">"),
@@ -107,16 +112,22 @@ pub fn parse_list(input: &str) -> IResult<&str, Expression> {
     )(input)
 }
 
-pub fn parse_named(input: &str) -> IResult<&str, Expression> {
-    map(
-        preceded(
-            char(':'),
-            separated_pair(recognize(alpha1), multispace0, parse_expression),
-        ),
-        |(name, value)| Expression::Named {
-            name: name.to_string(),
-            value: Box::new(value),
-        },
+pub fn parse_list_quoted(input: &str) -> IResult<&str, Expression> {
+    map(preceded(char('\''), parse_list), |list| {
+        Expression::List(vec![Expression::Symbol("quote".to_string()), list])
+    })(input)
+}
+
+pub fn parse_list_square(input: &str) -> IResult<&str, Expression> {
+    delimited(
+        char('['),
+        map(separated_list0(multispace1, parse_expression), |exprs| {
+            Expression::List(vec![
+                Expression::Symbol("quote".to_string()),
+                Expression::List(exprs),
+            ])
+        }),
+        cut(preceded(multispace0, char(']'))),
     )(input)
 }
 
@@ -130,8 +141,9 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
             parse_void,
             parse_symbol,
             parse_string,
-            parse_named,
             parse_list,
+            parse_list_quoted,
+            parse_list_square,
         )),
     )(input)
 }

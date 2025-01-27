@@ -13,16 +13,34 @@ impl Env {
     pub fn new(parent: Option<Rc<RefCell<Env>>>) -> Env {
         Env {
             parent,
-            local: HashMap::new(),
+            local: HashMap::from([
+                ("__EXPORTED".to_string(), Expression::Table(HashMap::new())),
+                ("__IMPORTED".to_string(), Expression::Table(HashMap::new())),
+            ]),
         }
     }
 
     pub fn get(&self, symbol: String) -> Option<Expression> {
-        self.local.get(&symbol).cloned().or_else(|| {
-            self.parent
-                .as_ref()
-                .and_then(|parent| parent.borrow().get(symbol))
-        })
+        self.local
+            .get(&symbol)
+            .cloned()
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .and_then(|parent| parent.borrow().get(symbol.clone()))
+            })
+            .or_else(|| {
+                self.get("__IMPORTED".to_string())
+                    .unwrap()
+                    .as_table()
+                    .unwrap()
+                    .get(&symbol)
+                    .cloned()
+            })
+    }
+
+    pub fn get_mut_local(&mut self, symbol: String) -> Option<&mut Expression> {
+        self.local.get_mut(&symbol)
     }
 
     pub fn set_local(&mut self, symbol: String, value: Expression) {

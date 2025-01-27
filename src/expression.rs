@@ -1,4 +1,9 @@
-use anyhow::Result;
+use color_eyre::{eyre::eyre, Result};
+use colored::Colorize;
+// use core::hash::Hasher;
+use hashbrown::HashMap;
+// use std::hash::Hash;
+use lazy_static::lazy_static;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::env::Env;
@@ -10,17 +15,21 @@ pub enum Expression {
     String(String),
     Symbol(String),
     List(Vec<Expression>),
+    Table(HashMap<String, Expression>),
     Function {
         arguments: Vec<Expression>,
         body: Box<Expression>,
     },
-    Named {
-        name: String,
-        value: Box<Expression>,
+    Builtin {
+        name: &'static str,
+        function: fn(&mut Rc<RefCell<Env>>, &[Expression]) -> Result<Expression>,
     },
-    Builtin(fn(&mut Rc<RefCell<Env>>, &[Expression]) -> Result<Expression>),
-    Boolean(bool),
-    Void,
+    Nil,
+}
+
+lazy_static! {
+    pub static ref NIL: Expression = Expression::Nil;
+    pub static ref TRUE: Expression = Expression::Symbol(String::from("t"));
 }
 
 impl Expression {
@@ -28,7 +37,7 @@ impl Expression {
         if let Expression::Integer(i) = self {
             Ok(*i)
         } else {
-            Err(anyhow::anyhow!(format!("Not an integer {:?}", self)))
+            Err(eyre!("Not an integer: {}", self))
         }
     }
 
@@ -36,7 +45,7 @@ impl Expression {
         if let Expression::Float(f) = self {
             Ok(*f)
         } else {
-            Err(anyhow::anyhow!(format!("Not a float {:?}", self)))
+            Err(eyre!("Not a float: {}", self))
         }
     }
 
@@ -44,7 +53,7 @@ impl Expression {
         if let Expression::String(s) = self {
             Ok(s.clone())
         } else {
-            Err(anyhow::anyhow!(format!("Not a string {:?}", self)))
+            Err(eyre!("Not a string: {}", self))
         }
     }
 
@@ -52,29 +61,36 @@ impl Expression {
         if let Expression::Symbol(s) = self {
             Ok(s.clone())
         } else {
-            Err(anyhow::anyhow!(format!("Not a symbol {:?}", self)))
+            Err(eyre!("Not a symbol: {}", self))
         }
     }
 
     pub fn as_boolean(&self) -> Result<bool> {
-        if let Expression::Boolean(b) = self {
-            Ok(*b)
-        } else {
-            Err(anyhow::anyhow!(format!("Not a bool {:?}", self)))
-        }
+        Ok(!matches!(self, Expression::Nil))
     }
 
     pub fn as_list(&self) -> Result<Vec<Expression>> {
         if let Expression::List(l) = self {
             Ok(l.clone())
         } else {
-            Err(anyhow::anyhow!(format!("Not a list {:?}", self)))
+            Err(eyre!("Not a list: {}", self))
+        }
+    }
+
+    pub fn as_table(&self) -> Result<HashMap<String, Expression>> {
+        if let Expression::Table(t) = self {
+            Ok(t.clone())
+        } else {
+            Err(eyre!("Not a list: {}", self))
         }
     }
 
     pub fn as_type_string(&self) -> String {
         match self {
-            Expression::Builtin(_) => "builtin".to_string(),
+            Expression::Builtin {
+                name: _,
+                function: _,
+            } => "builtin".to_string(),
             Expression::Function {
                 arguments: _,
                 body: _,
@@ -83,10 +99,42 @@ impl Expression {
             Expression::Integer(_) => "integer".to_string(),
             Expression::String(_) => "string".to_string(),
             Expression::Symbol(_) => "symbol".to_string(),
-            Expression::Named { name: _, value: _ } => "named".to_string(),
-            Expression::Void => "void".to_string(),
+            Expression::Nil => "nil".to_string(),
             Expression::Float(_) => "float".to_string(),
-            Expression::Boolean(_) => "boolean".to_string(),
+            Expression::Table(_) => "table".to_string(),
+        }
+    }
+
+    pub fn as_debug_string(&self) -> String {
+        match self {
+            Expression::Builtin { name, function: _ } => name.to_string(),
+            Expression::Function { arguments: _, body } => body.as_debug_string(),
+            Expression::List(list) => format!(
+                "({})",
+                list.iter()
+                    .map(|item| item.as_debug_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
+            Expression::Integer(i) => i.to_string(),
+            Expression::Float(f) => f.to_string(),
+            Expression::String(s) => format!("\"{s}\""),
+            Expression::Symbol(s) => s.to_string(),
+            Expression::Nil => "nil".to_string(),
+            Expression::Table(table) => {
+                if table.is_empty() {
+                    "{}".to_string()
+                } else {
+                    format!(
+                        "{{ {} }}",
+                        table
+                            .iter()
+                            .map(|(key, value)| format!("{key}: {value}"))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                }
+            }
         }
     }
 }
@@ -97,10 +145,11 @@ impl std::fmt::Display for Expression {
             f,
             "{}",
             match self {
-                Expression::Builtin(_) => "builtin".to_string(),
+                Expression::Builtin { name, function: _ } => format!("{}", name.yellow()),
                 Expression::Function { arguments, body } => {
                     format!(
-                        "function : ({}) => {}",
+                        "{} : ({}) => {}",
+                        "function".blue(),
                         arguments
                             .iter()
                             .map(|a| a.to_string())
@@ -116,14 +165,35 @@ impl std::fmt::Display for Expression {
                         .collect::<Vec<String>>()
                         .join(" ")
                 ),
-                Expression::Integer(i) => i.to_string(),
-                Expression::String(s) => s.to_string(),
+                Expression::Table(table) =>
+                    if table.is_empty() {
+                        "{}".to_string()
+                    } else {
+                        format!(
+                            "{{ {} }}",
+                            table
+                                .iter()
+                                .map(|(key, value)| format!("{key}: {value}"))
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        )
+                    },
+                Expression::Integer(i) => i.to_string().yellow().to_string(),
+                Expression::String(s) => format!("\"{}\"", s).green().to_string(),
                 Expression::Symbol(s) => s.to_string(),
-                Expression::Named { name, value } => format!(":{} {}", name, value),
-                Expression::Void => "void".to_string(),
-                Expression::Float(f) => format!("{:?}", f),
-                Expression::Boolean(b) => b.to_string(),
+                Expression::Nil => "nil".to_string().purple().to_string(),
+                Expression::Float(f) => format!("{:?}", f).yellow().to_string(),
             }
         )
+    }
+}
+
+impl From<bool> for Expression {
+    fn from(b: bool) -> Self {
+        if b {
+            TRUE.clone()
+        } else {
+            NIL.clone()
+        }
     }
 }
