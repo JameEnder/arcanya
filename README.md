@@ -57,8 +57,8 @@ You can print any variable using `print`
 Defining global variables can be done with `define`
 
 ```lisp
-(define x 5)
-(define y 7)
+(define 'x 5)
+(define 'y 7)
 
 (+ x y)
 ; 12
@@ -67,8 +67,8 @@ Defining global variables can be done with `define`
 Defining local variables can be done with `let`
 
 ```lisp
-(let x 5
-	(let y 7
+(let 'x 5
+	(let 'y 7
 		(+ x y)
 	)
 )
@@ -98,7 +98,7 @@ You can map over lists with `map`
 And fold over lists with `fold`
 
 ```lisp
-(fold + 0 '(1 2 3))
+(fold '+ 0 '(1 2 3))
 ; 6
 ```
 

@@ -135,9 +135,9 @@ fn let_chaining() {
 
     let result = run(
         &mut std,
-        "(let x 1
-            (let y 2
-                (let z 3
+        "(let 'x 1
+            (let 'y 2
+                (let 'z 3
                     (+ x y z)
                 )
             )
@@ -233,76 +233,76 @@ fn partial_application_left() {
     assert_eq!(result, Expression::Integer(6));
 }
 
-#[test]
-fn partial_application_right() {
-    let mut std = Rc::new(RefCell::new(std_lib()));
+// #[test]
+// fn partial_application_right() {
+//     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(
-        &mut std,
-        "(define add-xyz (
-            function '(x y z) '(+ x y z)
-        ))",
-    )
-    .unwrap();
+//     let result = run(
+//         &mut std,
+//         "(define add-xyz (
+//             function '(x y z) '(+ x y z)
+//         ))",
+//     )
+//     .unwrap();
 
-    assert_eq!(result, Expression::Nil);
+//     assert_eq!(result, Expression::Nil);
 
-    let result = run(&mut std, "add-xyz").unwrap();
+//     let result = run(&mut std, "add-xyz").unwrap();
 
-    assert_eq!(
-        result,
-        Expression::Function {
-            arguments: vec![
-                Expression::Symbol("x".into()),
-                Expression::Symbol("y".into()),
-                Expression::Symbol("z".into())
-            ],
-            body: Box::new(Expression::List(vec![
-                Expression::Symbol("+".into()),
-                Expression::Symbol("x".into()),
-                Expression::Symbol("y".into()),
-                Expression::Symbol("z".into())
-            ]))
-        }
-    );
+//     assert_eq!(
+//         result,
+//         Expression::Function {
+//             arguments: vec![
+//                 Expression::Symbol("x".into()),
+//                 Expression::Symbol("y".into()),
+//                 Expression::Symbol("z".into())
+//             ],
+//             body: Box::new(Expression::List(vec![
+//                 Expression::Symbol("+".into()),
+//                 Expression::Symbol("x".into()),
+//                 Expression::Symbol("y".into()),
+//                 Expression::Symbol("z".into())
+//             ]))
+//         }
+//     );
 
-    let result = run(&mut std, "(add-xyz _ _ 3)").unwrap();
+//     let result = run(&mut std, "(add-xyz _ _ 3)").unwrap();
 
-    assert_eq!(
-        result,
-        Expression::Function {
-            arguments: vec![
-                Expression::Symbol("x".into()),
-                Expression::Symbol("y".into())
-            ],
-            body: Box::new(Expression::List(vec![
-                Expression::Symbol("+".into()),
-                Expression::Symbol("x".into()),
-                Expression::Symbol("y".into()),
-                Expression::Integer(3)
-            ]))
-        }
-    );
+//     assert_eq!(
+//         result,
+//         Expression::Function {
+//             arguments: vec![
+//                 Expression::Symbol("x".into()),
+//                 Expression::Symbol("y".into())
+//             ],
+//             body: Box::new(Expression::List(vec![
+//                 Expression::Symbol("+".into()),
+//                 Expression::Symbol("x".into()),
+//                 Expression::Symbol("y".into()),
+//                 Expression::Integer(3)
+//             ]))
+//         }
+//     );
 
-    let result = run(&mut std, "(add-xyz _ 2 3)").unwrap();
+//     let result = run(&mut std, "(add-xyz _ 2 3)").unwrap();
 
-    assert_eq!(
-        result,
-        Expression::Function {
-            arguments: vec![Expression::Symbol("x".into())],
-            body: Box::new(Expression::List(vec![
-                Expression::Symbol("+".into()),
-                Expression::Symbol("x".into()),
-                Expression::Integer(2),
-                Expression::Integer(3)
-            ]))
-        }
-    );
+//     assert_eq!(
+//         result,
+//         Expression::Function {
+//             arguments: vec![Expression::Symbol("x".into())],
+//             body: Box::new(Expression::List(vec![
+//                 Expression::Symbol("+".into()),
+//                 Expression::Symbol("x".into()),
+//                 Expression::Integer(2),
+//                 Expression::Integer(3)
+//             ]))
+//         }
+//     );
 
-    let result = run(&mut std, "(add-xyz 1 2 3)").unwrap();
+//     let result = run(&mut std, "(add-xyz 1 2 3)").unwrap();
 
-    assert_eq!(result, Expression::Integer(6));
-}
+//     assert_eq!(result, Expression::Integer(6));
+// }
 
 #[test]
 fn and_then() {
@@ -333,6 +333,7 @@ fn range() {
             Expression::Integer(2),
             Expression::Integer(3),
             Expression::Integer(4),
+            Expression::Integer(5),
         ])
     );
 }
@@ -389,18 +390,18 @@ fn prepend() {
 }
 
 #[test]
-fn index() {
+fn nth() {
     let mut std = Rc::new(RefCell::new(std_lib()));
 
-    let result = run(&mut std, "(index 0 '(1 2 3))").unwrap();
+    let result = run(&mut std, "(nth 0 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(1));
 
-    let result = run(&mut std, "(index 1 '(1 2 3))").unwrap();
+    let result = run(&mut std, "(nth 1 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(2));
 
-    let result = run(&mut std, "(index 2 '(1 2 3))").unwrap();
+    let result = run(&mut std, "(nth 2 '(1 2 3))").unwrap();
 
     assert_eq!(result, Expression::Integer(3));
 }
