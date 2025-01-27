@@ -4,123 +4,48 @@ use hashbrown::HashMap;
 
 use crate::{env::Env, eval::*, expression::Expression, run};
 use color_eyre::{eyre::eyre, Result};
-fn has_float(list: &[Expression]) -> bool {
-    list.iter().any(|x| matches!(x, Expression::Float(_)))
-}
 
 const PLUS: Expression = Expression::Builtin {
     name: "+",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .map(|e| eval_expression(env, &e))
-            .collect::<Result<Vec<Expression>>>()?;
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        if has_float(&evaluated) {
-            Ok(Expression::Float(
-                evaluated
-                    .iter()
-                    .map(|x| x.as_f64())
-                    .collect::<Result<Vec<f64>>>()?
-                    .iter()
-                    .sum(),
-            ))
-        } else {
-            Ok(Expression::Integer(
-                evaluated
-                    .iter()
-                    .map(|x| x.as_i64())
-                    .collect::<Result<Vec<i64>>>()?
-                    .iter()
-                    .sum(),
-            ))
-        }
+        Ok(evaluated
+            .reduce(|acc, x| acc? + x?)
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
 const MINUS: Expression = Expression::Builtin {
     name: "-",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        let first = &evaluated[0];
-
-        if has_float(&evaluated) {
-            Ok(Expression::Float(
-                evaluated[1..]
-                    .iter()
-                    .flat_map(|x| x.as_f64())
-                    .fold(first.as_f64()?, |acc, x| acc - x),
-            ))
-        } else {
-            Ok(Expression::Integer(
-                evaluated[1..]
-                    .iter()
-                    .flat_map(|x| x.as_i64())
-                    .fold(first.as_i64()?, |acc, x| acc - x),
-            ))
-        }
+        Ok(evaluated
+            .reduce(|acc, x| acc? - x?)
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
 const MULTIPLY: Expression = Expression::Builtin {
     name: "*",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        if has_float(&evaluated) {
-            Ok(Expression::Float(
-                evaluated
-                    .iter()
-                    .flat_map(|l| eval_expression(env, &l).map(|v| v.as_f64()))
-                    .filter_map(Result::ok)
-                    .product(),
-            ))
-        } else {
-            Ok(Expression::Integer(
-                evaluated
-                    .iter()
-                    .flat_map(|l| eval_expression(env, &l).map(|v| v.as_i64()))
-                    .filter_map(Result::ok)
-                    .product(),
-            ))
-        }
+        Ok(evaluated
+            .reduce(|acc, x| acc? * x?)
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
 const DIVIDE: Expression = Expression::Builtin {
     name: "/",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        let first = &evaluated[0];
-
-        if has_float(&evaluated) {
-            Ok(Expression::Float(
-                evaluated[1..]
-                    .iter()
-                    .flat_map(|l| eval_expression(env, &l).map(|v| v.as_f64()))
-                    .filter_map(Result::ok)
-                    .fold(first.as_f64()?, |acc, x| acc / x),
-            ))
-        } else {
-            Ok(Expression::Integer(
-                evaluated[1..]
-                    .iter()
-                    .flat_map(|l| eval_expression(env, &l).map(|v| v.as_i64()))
-                    .filter_map(Result::ok)
-                    .fold(first.as_i64()?, |acc, x| acc / x),
-            ))
-        }
+        Ok(evaluated
+            .reduce(|acc, x| acc? / x?)
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
@@ -151,7 +76,6 @@ const IF: Expression = Expression::Builtin {
     name: "if",
     function: |env, list| {
         let condition = eval_expression(env, &list[0])?;
-
         let has_else = list.len() > 2;
 
         if condition.as_boolean()? {
@@ -167,11 +91,10 @@ const IF: Expression = Expression::Builtin {
 const DEFINE: Expression = Expression::Builtin {
     name: "define",
     function: |env, list| {
-        let name = &list[0];
-        let value = &list[1];
+        let name = eval_expression(env, &list[0])?;
 
         if let Expression::Symbol(_) = name {
-            let evaluated = eval_expression(env, value)?;
+            let evaluated = eval_expression(env, &list[1])?;
 
             env.as_ref()
                 .borrow_mut()
@@ -185,26 +108,69 @@ const DEFINE: Expression = Expression::Builtin {
 const LET: Expression = Expression::Builtin {
     name: "let",
     function: |env, list| {
-        let name = &list[0];
-        let value = &list[1];
+        let name = &eval_expression(env, &list[0])?;
+        let value = eval_expression(env, &list[1])?;
+
+        let mut local_env = Rc::new(RefCell::new(Env::new(Some(env.clone()))));
+        local_env
+            .as_ref()
+            .borrow_mut()
+            .set_local(name.as_symbol_string()?, value);
+
+        eval_expression(&mut local_env, &list[2])
+    },
+};
+
+const DEFINE_LOCAL: Expression = Expression::Builtin {
+    name: "define-local",
+    function: |env, list| {
+        let name = eval_expression(env, &list[0])?;
 
         if let Expression::Symbol(_) = name {
-            let evaluated = eval_expression(env, value)?;
+            let evaluated = eval_expression(env, &list[1])?;
+
             env.as_ref()
                 .borrow_mut()
                 .set_local(name.as_symbol_string()?, evaluated);
         }
 
-        eval_expression(env, &list[2])
+        Ok(Expression::Nil)
     },
 };
+
+const LIST: Expression = Expression::Builtin {
+    name: "list",
+    function: |env, list| {
+        Ok(Expression::List(
+            list.iter()
+                .map(|x| eval_expression(env, x))
+                .collect::<Result<Vec<Expression>>>()?,
+        ))
+    },
+};
+
+// const CHANGE: Expression = Expression::Builtin {
+//     name: "change",
+//     function: |env, list| {
+//         let name = &eval_expression(env, &list[0])?;
+//         let value = eval_expression(env, &list[1])?;
+
+//         if let Expression::Symbol(_) = name {
+//             env.as_ref()
+//                 .borrow_mut()
+//                 .set_local(name.as_symbol_string()?, value);
+//         }
+
+//         Ok(Expression::Nil)
+//     },
+// };
 
 const EQUAL: Expression = Expression::Builtin {
     name: "=",
     function: |env, list| {
         let evaluated = list
             .iter()
-            .flat_map(|e| eval_expression(env, &e))
+            .flat_map(|e| eval_expression(env, e))
             .collect::<Vec<Expression>>();
 
         Ok(evaluated[1..].iter().all(|x| evaluated[0] == *x).into())
@@ -214,96 +180,44 @@ const EQUAL: Expression = Expression::Builtin {
 const GREATER: Expression = Expression::Builtin {
     name: ">",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        Ok(if has_float(&evaluated) {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_f64())
-                .all(|x| evaluated[0].as_f64().unwrap() > x)
-                .into()
-        } else {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_i64())
-                .all(|x| evaluated[0].as_i64().unwrap() > x)
-                .into()
-        })
+        Ok(evaluated
+            .reduce(|acc, x| Ok((acc? > x?).into()))
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
 const GREATER_EQUAL: Expression = Expression::Builtin {
     name: ">=",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        Ok(if has_float(&evaluated) {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_f64())
-                .all(|x| evaluated[0].as_f64().unwrap() >= x)
-                .into()
-        } else {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_i64())
-                .all(|x| evaluated[0].as_i64().unwrap() >= x)
-                .into()
-        })
+        Ok(evaluated
+            .reduce(|acc, x| Ok((acc? >= x?).into()))
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
 const LESS: Expression = Expression::Builtin {
     name: "<",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        Ok(if has_float(&evaluated) {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_f64())
-                .all(|x| evaluated[0].as_f64().unwrap() < x)
-                .into()
-        } else {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_i64())
-                .all(|x| evaluated[0].as_i64().unwrap() < x)
-                .into()
-        })
+        Ok(evaluated
+            .reduce(|acc, x| Ok((acc? < x?).into()))
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
 const LESS_EQUAL: Expression = Expression::Builtin {
     name: "<=",
     function: |env, list| {
-        let evaluated = list
-            .iter()
-            .flat_map(|e| eval_expression(env, &e))
-            .collect::<Vec<Expression>>();
+        let evaluated = list.iter().map(|e| eval_expression(env, e));
 
-        Ok(if has_float(&evaluated) {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_f64())
-                .all(|x| evaluated[0].as_f64().unwrap() <= x)
-                .into()
-        } else {
-            evaluated[1..]
-                .iter()
-                .flat_map(|x| x.as_i64())
-                .all(|x| evaluated[0].as_i64().unwrap() <= x)
-                .into()
-        })
+        Ok(evaluated
+            .reduce(|acc, x| Ok((acc? <= x?).into()))
+            .ok_or(eyre!("Missing parameters"))??)
     },
 };
 
@@ -312,7 +226,7 @@ const AND: Expression = Expression::Builtin {
     function: |env, list| {
         let evaluated = list
             .iter()
-            .flat_map(|e| eval_expression(env, &e))
+            .flat_map(|e| eval_expression(env, e))
             .collect::<Vec<Expression>>();
 
         Ok(evaluated[1..]
@@ -328,7 +242,7 @@ const OR: Expression = Expression::Builtin {
     function: |env, list| {
         let evaluated = list
             .iter()
-            .flat_map(|e| eval_expression(env, &e))
+            .flat_map(|e| eval_expression(env, e))
             .collect::<Vec<Expression>>();
 
         Ok(evaluated[1..]
@@ -345,8 +259,7 @@ const LET_MANY: Expression = Expression::Builtin {
         let variables = eval_expression(env, &list[0])?.as_list()?;
 
         for variable in variables {
-            let var = eval_expression(env, &variable)?.as_list()?;
-
+            let var = variable.as_list()?;
             let name = &var[0];
             let value = &var[1];
             let evaluated = eval_expression(env, value)?;
@@ -396,7 +309,7 @@ const TIME: Expression = Expression::Builtin {
 
         let result = eval_expression(env, &list[0]);
 
-        println!("Took: {} ms", now.elapsed().as_millis());
+        println!("time: {} {} ms", &list[0], now.elapsed().as_millis());
 
         result
     },
@@ -407,7 +320,7 @@ const CONCAT: Expression = Expression::Builtin {
     function: |env, list| {
         Ok(Expression::String(
             list.iter()
-                .flat_map(|l| eval_expression(env, &l).map(|v| v.as_string()))
+                .flat_map(|l| eval_expression(env, l).map(|v| v.as_string()))
                 .filter_map(Result::ok)
                 .collect::<Vec<String>>()
                 .join(""),
@@ -420,7 +333,7 @@ const RANGE: Expression = Expression::Builtin {
     function: |env, list| {
         Ok(Expression::List(
             (eval_expression(env, &list[0])?.as_i64()?
-                ..eval_expression(env, &list[1])?.as_i64()?)
+                ..=eval_expression(env, &list[1])?.as_i64()?)
                 .map(Expression::Integer)
                 .collect(),
         ))
@@ -432,7 +345,7 @@ const FOR: Expression = Expression::Builtin {
     function: |env, list| {
         let iterator_name = &list[0];
         let iterable = eval_expression(env, &list[1])?;
-        let func = &list[2];
+        let func = eval_expression(env, &list[2])?;
 
         for i in iterable.as_list()? {
             if let Expression::Builtin {
@@ -451,20 +364,20 @@ const FOR: Expression = Expression::Builtin {
 const FOR_I: Expression = Expression::Builtin {
     name: "for-i",
     function: |env, list| {
-        let iterator_name = &list[0].as_list()?[0];
-        let iterator_value = &list[0].as_list()?[1];
-        let condition = &list[1];
-        let after = &list[2];
-        let f = &list[3];
+        let iterator_name = &list[0];
+        let iterator_value = &list[1];
+        let condition = eval_expression(env, &list[2])?;
+        let f = eval_expression(env, &list[3])?;
+        let after = eval_expression(env, &list[4])?;
         let mut current = iterator_value.clone();
 
         if let Expression::Builtin {
             name: _,
-            function: actual,
+            function: builtin_let,
         } = LET
         {
             loop {
-                if !actual(
+                if !builtin_let(
                     env,
                     &[iterator_name.clone(), current.clone(), condition.clone()],
                 )?
@@ -472,8 +385,13 @@ const FOR_I: Expression = Expression::Builtin {
                 {
                     break;
                 }
-                actual(env, &[iterator_name.clone(), current.clone(), f.clone()])?;
-                current = actual(env, &[iterator_name.clone(), current, after.clone()])?;
+
+                builtin_let(
+                    env,
+                    &[iterator_name.clone(), current.clone(), after.clone()],
+                )?;
+
+                current = builtin_let(env, &[iterator_name.clone(), current.clone(), f.clone()])?;
             }
         }
 
@@ -562,9 +480,13 @@ const TO_SYMBOL: Expression = Expression::Builtin {
 const AND_THEN: Expression = Expression::Builtin {
     name: "and-then",
     function: |env, list| {
-        eval_expression(env, &list[0])?;
+        let mut last = Expression::Nil;
 
-        eval_expression(env, &list[1])
+        for expression in list {
+            last = eval_expression(env, expression)?;
+        }
+
+        Ok(last)
     },
 };
 
@@ -611,7 +533,7 @@ const WEB_SERVER: Expression = Expression::Builtin {
         for request in server.incoming_requests() {
             let response =
                 tiny_http::Response::from_string(if let Some(expr) = router.get(request.url()) {
-                    eval_expression(env, &expr)?.as_string()?
+                    eval_expression(env, expr)?.as_string()?
                 } else {
                     "404".to_string()
                 });
@@ -659,8 +581,8 @@ const ROUND: Expression = Expression::Builtin {
     },
 };
 
-const INDEX: Expression = Expression::Builtin {
-    name: "index",
+const NTH: Expression = Expression::Builtin {
+    name: "nth",
     function: |env, list| {
         let index = eval_expression(env, &list[0])?.as_i64()? as usize;
         let l = eval_expression(env, &list[1])?.as_list()?;
@@ -896,7 +818,18 @@ const APPLY: Expression = Expression::Builtin {
         let args = eval_expression(env, &list[1])?.as_list()?;
         let args: Vec<Expression> = vec![f.clone()].into_iter().chain(args).collect();
 
-        Ok(eval_list(env, &args)?)
+        eval_list(env, &args)
+    },
+};
+
+const INSPECT: Expression = Expression::Builtin {
+    name: "inspect",
+    function: |env, list| {
+        let value = eval_expression(env, &list[0])?;
+
+        println!("{}: {}", &list[0], value);
+
+        Ok(value)
     },
 };
 
@@ -917,6 +850,8 @@ pub fn std_lib() -> Env {
         FUNCTION,
         IF,
         DEFINE,
+        DEFINE_LOCAL,
+        LIST,
         LET,
         LET_MANY,
         EVAL,
@@ -940,7 +875,7 @@ pub fn std_lib() -> Env {
         CONCAT_SYMBOL,
         APPEND,
         PREPEND,
-        INDEX,
+        NTH,
         SLICE,
         REVERSE,
         LENGTH,
@@ -957,6 +892,7 @@ pub fn std_lib() -> Env {
         QUOTE,
         ENV,
         APPLY,
+        INSPECT,
     ];
 
     /*

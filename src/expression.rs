@@ -197,3 +197,95 @@ impl From<bool> for Expression {
         }
     }
 }
+
+impl std::ops::Add for Expression {
+    type Output = Result<Expression>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (&self, &rhs) {
+            (Expression::Integer(a), Expression::Integer(b)) => Ok(Expression::Integer(a + b)),
+            (Expression::Float(a), Expression::Float(b)) => Ok(Expression::Float(a + b)),
+            (Expression::Integer(a), Expression::Float(b))
+            | (Expression::Float(b), Expression::Integer(a)) => {
+                Ok(Expression::Float(*a as f64 + b))
+            }
+            _ => Err(eyre!("Can't add {} and {}", self, rhs)),
+        }
+    }
+}
+
+impl std::ops::Sub for Expression {
+    type Output = Result<Expression>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (&self, &rhs) {
+            (Expression::Integer(a), Expression::Integer(b)) => Ok(Expression::Integer(a - b)),
+            (Expression::Float(a), Expression::Float(b)) => Ok(Expression::Float(a - b)),
+            (Expression::Integer(a), Expression::Float(b))
+            | (Expression::Float(b), Expression::Integer(a)) => {
+                Ok(Expression::Float(*a as f64 - b))
+            }
+            _ => Err(eyre!("Can't subtract {} and {}", self, rhs)),
+        }
+    }
+}
+
+impl std::ops::Mul for Expression {
+    type Output = Result<Expression>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (&self, &rhs) {
+            (Expression::Integer(a), Expression::Integer(b)) => Ok(Expression::Integer(a * b)),
+            (Expression::Float(a), Expression::Float(b)) => Ok(Expression::Float(a * b)),
+            (Expression::Integer(a), Expression::Float(b))
+            | (Expression::Float(b), Expression::Integer(a)) => {
+                Ok(Expression::Float(*a as f64 * b))
+            }
+            _ => Err(eyre!("Can't multiply {} and {}", self, rhs)),
+        }
+    }
+}
+
+impl std::ops::Div for Expression {
+    type Output = Result<Expression>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (&self, &rhs) {
+            (Expression::Integer(a), Expression::Integer(b)) => {
+                if *b == 0 {
+                    Err(eyre!("Division by zero"))
+                } else {
+                    Ok(Expression::Integer(a / b))
+                }
+            }
+            (Expression::Float(a), Expression::Float(b)) => {
+                if *b == 0.0 {
+                    Err(eyre!("Division by zero"))
+                } else {
+                    Ok(Expression::Float(a / b))
+                }
+            }
+            (Expression::Integer(a), Expression::Float(b))
+            | (Expression::Float(b), Expression::Integer(a)) => {
+                if *b == 0.0 {
+                    Err(eyre!("Division by zero"))
+                } else {
+                    Ok(Expression::Float(*a as f64 / b))
+                }
+            }
+            _ => Err(eyre!("Can't divide {} and {}", self, rhs)),
+        }
+    }
+}
+
+impl std::cmp::PartialOrd for Expression {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Expression::Integer(a), Expression::Integer(b)) => Some(a.cmp(b)),
+            (Expression::Float(a), Expression::Float(b)) => Some(a.partial_cmp(b)?),
+            (Expression::Integer(a), Expression::Float(b))
+            | (Expression::Float(b), Expression::Integer(a)) => Some(a.partial_cmp(&(*b as i64))?),
+            _ => None,
+        }
+    }
+}

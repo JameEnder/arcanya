@@ -112,29 +112,17 @@ pub fn parse_list(input: &str) -> IResult<&str, Expression> {
     )(input)
 }
 
-pub fn parse_list_quoted(input: &str) -> IResult<&str, Expression> {
-    map(preceded(char('\''), parse_list), |list| {
+pub fn parse_quoted(input: &str) -> IResult<&str, Expression> {
+    map(preceded(char('\''), parse_expression), |list| {
         Expression::List(vec![Expression::Symbol("quote".to_string()), list])
     })(input)
-}
-
-pub fn parse_list_square(input: &str) -> IResult<&str, Expression> {
-    delimited(
-        char('['),
-        map(separated_list0(multispace1, parse_expression), |exprs| {
-            Expression::List(vec![
-                Expression::Symbol("quote".to_string()),
-                Expression::List(exprs),
-            ])
-        }),
-        cut(preceded(multispace0, char(']'))),
-    )(input)
 }
 
 pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     preceded(
         multispace0,
         alt((
+            parse_quoted,
             parse_float,
             parse_integer,
             parse_bool,
@@ -142,8 +130,6 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
             parse_symbol,
             parse_string,
             parse_list,
-            parse_list_quoted,
-            parse_list_square,
         )),
     )(input)
 }

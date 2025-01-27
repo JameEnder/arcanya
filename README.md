@@ -79,8 +79,8 @@ Or by using let multiple with `let*`
 
 ```lisp
 (let* '(
-	'(x 5)
-	'(y 7)
+	(x 5)
+	(y 7)
 ) (+ x y))
 ; 12
 ```

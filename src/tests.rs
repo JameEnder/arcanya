@@ -113,7 +113,7 @@ fn fibonacci() {
 
     let result = run(
         &mut std,
-        "(define fibonacci (function '(x)
+        "(define 'fibonacci (function '(x)
             '(if (<= x 2) 1 (+ (fibonacci (- x 1)) (fibonacci (- x 2)))))
         )",
     )
@@ -155,9 +155,9 @@ fn let_multi() {
     let result = run(
         &mut std,
         "(let* '(
-            '(x 1)
-            '(y 2)
-            '(z 3)
+            (x 1)
+            (y 2)
+            (z 3)
         ) (+ x y z))",
     )
     .unwrap();
@@ -171,7 +171,7 @@ fn partial_application_left() {
 
     let result = run(
         &mut std,
-        "(define add-xyz (
+        "(define 'add-xyz (
             function '(x y z) '(+ x y z)
         ))",
     )
@@ -208,10 +208,8 @@ fn partial_application_left() {
                 Expression::Symbol("z".into())
             ],
             body: Box::new(Expression::List(vec![
-                Expression::Symbol("+".into()),
+                run(&mut std, "add-xyz").unwrap(),
                 Expression::Integer(1),
-                Expression::Symbol("y".into()),
-                Expression::Symbol("z".into())
             ]))
         }
     );
@@ -223,10 +221,9 @@ fn partial_application_left() {
         Expression::Function {
             arguments: vec![Expression::Symbol("z".into())],
             body: Box::new(Expression::List(vec![
-                Expression::Symbol("+".into()),
+                run(&mut std, "add-xyz").unwrap(),
                 Expression::Integer(1),
                 Expression::Integer(2),
-                Expression::Symbol("z".into())
             ]))
         }
     );
@@ -314,7 +311,7 @@ fn and_then() {
     let result = run(
         &mut std,
         "(and-then
-            (define add (function '(x y) '(+ x y)))
+            (define 'add (function '(x y) '(+ x y)))
             (add 1 2)
         )",
     )

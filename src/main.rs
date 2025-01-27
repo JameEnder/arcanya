@@ -22,25 +22,41 @@ fn main() -> Result<()> {
 
     let mut global = Rc::new(RefCell::new(builtin::std_lib()));
 
-    let mut buffer = String::new();
+    let file_path = std::env::args().nth(1);
 
-    loop {
-        buffer.clear();
+    if let Some(file_path) = file_path {
+        let content = std::fs::read_to_string(file_path)?;
+        let content = content.trim();
 
-        let mut lock = std::io::stdout().lock();
-        write!(lock, "> ")?;
-        std::io::stdout().flush()?;
-
-        let stdin = std::io::stdin();
-        let mut handle = stdin.lock();
-
-        handle.read_line(&mut buffer)?;
-
-        let returned = run(&mut global, &buffer);
+        let returned = run(&mut global, &content);
 
         match returned {
             Ok(value) => println!("=> {}", value),
             Err(err) => println!("{:?}", err),
+        }
+
+        Ok(())
+    } else {
+        let mut buffer = String::new();
+
+        loop {
+            buffer.clear();
+
+            let mut lock = std::io::stdout().lock();
+            write!(lock, "> ")?;
+            std::io::stdout().flush()?;
+
+            let stdin = std::io::stdin();
+            let mut handle = stdin.lock();
+
+            handle.read_line(&mut buffer)?;
+
+            let returned = run(&mut global, &buffer);
+
+            match returned {
+                Ok(value) => println!("=> {}", value),
+                Err(err) => println!("{:?}", err),
+            }
         }
     }
 }

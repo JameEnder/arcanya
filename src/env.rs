@@ -39,6 +39,22 @@ impl Env {
             })
     }
 
+    // pub fn get_mut<'e>(&'e mut self, symbol: &str) -> Option<&'e mut Expression> {
+    //     if let Some(value) = self.local.get_mut(symbol) {
+    //         Some(value)
+    //     } else if let Some(parent) = &self.parent {
+    //         let parent = parent.as_ref();
+
+    //         let mut parent: std::cell::RefMut<'e, _> = parent.borrow_mut();
+
+    //         let value: Option<&'e mut Expression> = parent.get_mut(symbol);
+
+    //         value
+    //     } else {
+    //         None
+    //     }
+    // }
+
     pub fn get_mut_local(&mut self, symbol: String) -> Option<&mut Expression> {
         self.local.get_mut(&symbol)
     }

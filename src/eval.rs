@@ -29,7 +29,7 @@ pub fn eval_expression(env: &mut Rc<RefCell<Env>>, expr: &Expression) -> Result<
         | Expression::Table(_)
         | Expression::Nil => Ok(expr.clone()),
         Expression::Symbol(s) => Ok(env.borrow().get(s).unwrap_or(Expression::Nil)),
-        Expression::List(l) => eval_list(env, &l),
+        Expression::List(l) => eval_list(env, l),
     }
 }
 
@@ -47,59 +47,43 @@ pub fn eval_list(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expr
     }
 
     match caller {
-        Expression::Function { arguments, body } => {
-            let mut e = Rc::new(RefCell::new(Env {
-                parent: Some(env.clone()),
-                local: HashMap::new(),
-            }));
-
+        Expression::Function {
+            ref arguments,
+            ref body,
+        } => {
             if arguments.len() != list.len() - 1 || list.contains(&Expression::Symbol("_".into())) {
-                if let Expression::List(body_list) = *body {
-                    let mut specified_arguments_map = HashMap::new();
+                if list.len() == 1 {
+                    Ok(caller)
+                } else if let Expression::List(_) = *(body.clone()) {
+                    let current_arguments = &list[1..];
 
-                    for i in 1..list.len() {
-                        if list[i] != Expression::Symbol("_".into()) {
-                            specified_arguments_map
-                                .insert(arguments[i - 1].as_symbol_string()?, list[i].clone());
-                        }
-                    }
-
-                    let new_body = body_list
-                        .iter()
-                        .map(|x| {
-                            x.as_symbol_string()
-                                .ok()
-                                .and_then(|s| specified_arguments_map.get(&s))
-                                .unwrap_or(x)
-                        })
-                        .cloned()
-                        .collect();
-
-                    let new_arguments = arguments
-                        .iter()
-                        .filter(|arg| {
-                            !arg.as_symbol_string()
-                                .is_ok_and(|s| specified_arguments_map.contains_key(&s))
-                        })
-                        .cloned()
-                        .collect();
+                    let new_arguments = &arguments[current_arguments.len()..];
+                    let mut new_body = vec![caller.clone()];
+                    new_body.extend(current_arguments.iter().cloned());
 
                     Ok(Expression::Function {
-                        arguments: new_arguments,
+                        arguments: new_arguments.to_vec(),
                         body: Box::new(Expression::List(new_body)),
                     })
                 } else {
                     Ok(Expression::Nil)
                 }
             } else {
+                let mut e = Rc::new(RefCell::new(Env {
+                    parent: Some(env.clone()),
+                    local: HashMap::new(),
+                }));
+
+                let current_arguments = &list[1..];
+
                 for i in 0..arguments.len() {
                     e.as_ref().borrow_mut().set_local(
                         arguments[i].as_symbol_string()?,
-                        eval_expression(env, &list[i + 1])?,
+                        eval_expression(env, &current_arguments[i])?,
                     );
                 }
 
-                eval_expression(&mut e, &*body)
+                eval_expression(&mut e, &body)
             }
         }
         // TODO: Partial application on Builtins
