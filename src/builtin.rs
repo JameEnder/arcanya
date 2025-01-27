@@ -46,7 +46,7 @@ const MINUS: Expression = Expression::Builtin {
             .flat_map(|e| eval_expression(env, &e))
             .collect::<Vec<Expression>>();
 
-        let first = evaluated[0].clone();
+        let first = &evaluated[0];
 
         if has_float(&evaluated) {
             Ok(Expression::Float(
@@ -102,7 +102,7 @@ const DIVIDE: Expression = Expression::Builtin {
             .flat_map(|e| eval_expression(env, &e))
             .collect::<Vec<Expression>>();
 
-        let first = evaluated[0].clone();
+        let first = &evaluated[0];
 
         if has_float(&evaluated) {
             Ok(Expression::Float(
@@ -451,11 +451,11 @@ const FOR: Expression = Expression::Builtin {
 const FOR_I: Expression = Expression::Builtin {
     name: "for-i",
     function: |env, list| {
-        let iterator_name = &list[0].as_list()?[0].clone();
-        let iterator_value = &list[0].as_list()?[1].clone();
+        let iterator_name = &list[0].as_list()?[0];
+        let iterator_value = &list[0].as_list()?[1];
         let condition = &list[1];
         let after = &list[2];
-        let f = list[3].clone();
+        let f = &list[3];
         let mut current = iterator_value.clone();
 
         if let Expression::Builtin {
@@ -573,7 +573,7 @@ const EXISTS: Expression = Expression::Builtin {
     function: |env, list| {
         let evaluated = eval_expression(env, &list[0])?.as_symbol_string()?;
 
-        Ok(env.as_ref().borrow().get(evaluated).is_some().into())
+        Ok(env.as_ref().borrow().get(&evaluated).is_some().into())
     },
 };
 
@@ -631,7 +631,7 @@ const WEB_SERVER: Expression = Expression::Builtin {
 const APPEND: Expression = Expression::Builtin {
     name: "append",
     function: |env, list| {
-        let mut new_list = eval_expression(env, &list[1])?.as_list()?.clone();
+        let mut new_list = eval_expression(env, &list[1])?.as_list()?;
 
         new_list.push(eval_expression(env, &list[0])?);
 
@@ -823,7 +823,7 @@ const IMPORT: Expression = Expression::Builtin {
 
         for (symbol, value) in module_env
             .borrow_mut()
-            .get("__EXPORTED".to_string())
+            .get("__EXPORTED")
             .unwrap()
             .as_table()?
         {
@@ -845,7 +845,7 @@ const EXPORT: Expression = Expression::Builtin {
     function: |env, list| {
         let symbol = &list[0];
 
-        let value = env.borrow_mut().get(symbol.as_symbol_string()?).unwrap();
+        let value = env.borrow_mut().get(&symbol.as_symbol_string()?).unwrap();
 
         if let Expression::Table(ref mut table) = env
             .borrow_mut()
@@ -865,11 +865,11 @@ const MODULE: Expression = Expression::Builtin {
         Ok(Expression::Table(HashMap::from([
             (
                 "imported".to_string(),
-                env.borrow().get("__IMPORTED".to_string()).unwrap(),
+                env.borrow().get("__IMPORTED").unwrap(),
             ),
             (
                 "exported".to_string(),
-                env.borrow().get("__EXPORTED".to_string()).unwrap(),
+                env.borrow().get("__EXPORTED").unwrap(),
             ),
         ])))
     },

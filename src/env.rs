@@ -20,21 +20,21 @@ impl Env {
         }
     }
 
-    pub fn get(&self, symbol: String) -> Option<Expression> {
+    pub fn get(&self, symbol: &str) -> Option<Expression> {
         self.local
-            .get(&symbol)
+            .get(symbol)
             .cloned()
             .or_else(|| {
                 self.parent
                     .as_ref()
-                    .and_then(|parent| parent.borrow().get(symbol.clone()))
+                    .and_then(|parent| parent.borrow().get(symbol))
             })
             .or_else(|| {
-                self.get("__IMPORTED".to_string())
+                self.get("__IMPORTED")
                     .unwrap()
                     .as_table()
                     .unwrap()
-                    .get(&symbol)
+                    .get(symbol)
                     .cloned()
             })
     }
