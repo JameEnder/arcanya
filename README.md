@@ -112,3 +112,21 @@ Concat strings with `concat`
 )
 ; you can figure that out ;)
 ```
+
+Example program for generating Fibonacci numbers
+
+```lisp
+(define 'fibonacci (function '(x) '(and-then
+	(define 'nums '(0 1))
+
+	(for 'i (range 0 (- x 2))
+		'(define 'nums 
+			(list 
+				(nth 1 nums)
+				(+ (nth 0 nums) (nth 1 nums)))))
+	
+	(nth 1 nums)
+)))
+
+(fibonacci 10)
+```
