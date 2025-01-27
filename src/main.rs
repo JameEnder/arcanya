@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 pub fn run(env: &mut Rc<RefCell<Env>>, input: &str) -> Result<Expression> {
     match parse_expression(input) {
         Ok((rest, expr)) => {
-            let result = eval_expression(env, expr);
+            let result = eval_expression(env, &expr);
             let rest = rest.trim();
 
             if !rest.is_empty() {
@@ -64,7 +64,7 @@ pub fn run(env: &mut Rc<RefCell<Env>>, input: &str) -> Result<Expression> {
 #[allow(dead_code)]
 fn run_log(env: &mut Rc<RefCell<Env>>, input: &str) -> Result<Expression> {
     let value = parse_expression(input)
-        .map(|(_, expr)| eval_expression(env, expr))
+        .map(|(_, expr)| eval_expression(env, &expr))
         .map_err(|e| e.to_owned())?;
 
     println!(

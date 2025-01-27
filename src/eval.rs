@@ -13,7 +13,7 @@ pub static DEBUG_MODE: bool = false;
 #[allow(dead_code)]
 pub static LAST_EVALUATION_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-pub fn eval_expression(env: &mut Rc<RefCell<Env>>, expr: Expression) -> Result<Expression> {
+pub fn eval_expression(env: &mut Rc<RefCell<Env>>, expr: &Expression) -> Result<Expression> {
     match expr {
         Expression::Integer(_)
         | Expression::String(_)
@@ -27,17 +27,17 @@ pub fn eval_expression(env: &mut Rc<RefCell<Env>>, expr: Expression) -> Result<E
             body: _,
         }
         | Expression::Table(_)
-        | Expression::Nil => Ok(expr),
-        Expression::Symbol(s) => Ok(env.borrow().get(s).unwrap_or(Expression::Nil)),
+        | Expression::Nil => Ok(expr.clone()),
+        Expression::Symbol(s) => Ok(env.borrow().get(s.clone()).unwrap_or(Expression::Nil)),
         Expression::List(l) => eval_list(env, &l),
     }
 }
 
 pub fn eval_list(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expression> {
-    let mut caller = eval_expression(env, list[0].clone())?;
+    let mut caller = eval_expression(env, &list[0])?;
 
     while let Expression::List(_) = caller {
-        caller = eval_expression(env, caller)?;
+        caller = eval_expression(env, &caller)?;
     }
 
     EVALUATION_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -95,14 +95,14 @@ pub fn eval_list(env: &mut Rc<RefCell<Env>>, list: &[Expression]) -> Result<Expr
                 for i in 0..arguments.len() {
                     let mut value = list[i + 1].clone();
 
-                    value = eval_expression(env, value)?;
+                    value = eval_expression(env, &value)?;
 
                     e.as_ref()
                         .borrow_mut()
                         .set_local(arguments[i].clone().as_symbol_string()?, value);
                 }
 
-                eval_expression(&mut e, *body)
+                eval_expression(&mut e, &*body)
             }
         }
         // TODO: Partial application on Builtins
